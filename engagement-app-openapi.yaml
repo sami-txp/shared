@@ -92,6 +92,118 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
+  /users/upload-csv:
+    post:
+      tags:
+        - Users
+      summary: Upload users via CSV file
+      description: |
+        Uploads multiple user records from a CSV file.
+
+        The CSV file should have the following columns:
+        - fullName (required): User's full name
+        - email (required): User's email address
+
+        Example CSV format:
+        ```
+        fullName,email
+        John Doe,john.doe@gmail.com
+        Jane Smith,jane.smith@gmail.com
+        ```
+
+        The endpoint will:
+        - Validate each row in the CSV
+        - Skip users that already exist
+        - Create new user accounts
+        - Return a summary of processed records
+      operationId: uploadUsersCSV
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: CSV file containing user data
+            encoding:
+              file:
+                contentType: text/csv
+      responses:
+        '200':
+          description: CSV file processed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BulkUploadResponse'
+              examples:
+                success:
+                  summary: Successful bulk upload
+                  value:
+                    success: true
+                    data:
+                      totalRecords: 10
+                      successCount: 8
+                      skipCount: 2
+                      errorCount: 0
+                      skippedUsers:
+                        - email: existing.user@gmail.com
+                          reason: User already exists
+                        - email: duplicate@gmail.com
+                          reason: User already exists
+                    message: CSV file processed successfully
+        '400':
+          description: Invalid CSV file or validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BulkUploadErrorResponse'
+              examples:
+                invalidFormat:
+                  summary: Invalid CSV format
+                  value:
+                    success: false
+                    error:
+                      code: INVALID_CSV_FORMAT
+                      message: Invalid CSV format or missing required columns
+                      details:
+                        field: file
+                        reason: CSV must contain 'fullName' and 'email' columns
+                invalidData:
+                  summary: Validation errors in CSV
+                  value:
+                    success: false
+                    error:
+                      code: CSV_VALIDATION_ERROR
+                      message: CSV contains validation errors
+                      details:
+                        rowsWithErrors:
+                          - rowNumber: 3
+                            email: invalid.email
+                            reason: Invalid email format
+                          - rowNumber: 5
+                            fullName: A
+                            reason: Full name must be at least 2 characters
+        '413':
+          description: File too large
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                fileTooLarge:
+                  value:
+                    success: false
+                    error:
+                      code: FILE_TOO_LARGE
+                      message: File size exceeds maximum allowed size (5MB)
+        '500':
+          $ref: '#/components/responses/InternalError'
+
   /users/{email}:
     get:
       tags:
@@ -922,6 +1034,107 @@ components:
           example: false
         error:
           $ref: '#/components/schemas/ErrorDetail'
+
+    BulkUploadData:
+      type: object
+      properties:
+        totalRecords:
+          type: integer
+          description: Total number of records in the CSV file
+          example: 10
+        successCount:
+          type: integer
+          description: Number of users successfully created
+          example: 8
+        skipCount:
+          type: integer
+          description: Number of users skipped (already exist)
+          example: 2
+        errorCount:
+          type: integer
+          description: Number of records with errors
+          example: 0
+        skippedUsers:
+          type: array
+          description: List of users that were skipped with reasons
+          items:
+            type: object
+            properties:
+              email:
+                type: string
+                format: email
+                example: existing.user@gmail.com
+              reason:
+                type: string
+                example: User already exists
+        errors:
+          type: array
+          description: List of validation errors (if any)
+          items:
+            type: object
+            properties:
+              rowNumber:
+                type: integer
+                example: 3
+              email:
+                type: string
+                example: invalid.email
+              reason:
+                type: string
+                example: Invalid email format
+
+    BulkUploadResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/BulkUploadData'
+        message:
+          type: string
+          example: CSV file processed successfully
+
+    BulkUploadErrorDetail:
+      type: object
+      properties:
+        code:
+          type: string
+          example: CSV_VALIDATION_ERROR
+        message:
+          type: string
+          example: CSV contains validation errors
+        details:
+          type: object
+          properties:
+            field:
+              type: string
+              example: file
+            reason:
+              type: string
+              example: CSV must contain 'fullName' and 'email' columns
+            rowsWithErrors:
+              type: array
+              items:
+                type: object
+                properties:
+                  rowNumber:
+                    type: integer
+                  email:
+                    type: string
+                  fullName:
+                    type: string
+                  reason:
+                    type: string
+
+    BulkUploadErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          $ref: '#/components/schemas/BulkUploadErrorDetail'
 
   responses:
     BadRequest:
