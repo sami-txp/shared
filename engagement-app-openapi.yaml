@@ -1,0 +1,988 @@
+openapi: 3.0.0
+info:
+  title: Game Leaderboard API
+  version: 1.0.0
+  description: |
+    REST API for browser game leaderboard system.
+    
+    This API allows users to:
+    - Register and manage user profiles
+    - Submit game scores
+    - View score history
+    - Access global leaderboards
+    - Retrieve game statistics
+
+servers:
+  - url: https://{functionApp}.azurewebsites.net/api
+    description: Azure Functions production server
+    variables:
+      functionApp:
+        default: function-app
+        description:  Azure Function App name
+  - url: http://localhost:7071/api
+    description: Local development server
+
+tags:
+  - name: Users
+    description: User management operations
+  - name: Scores
+    description: Score submission and retrieval
+  - name: Leaderboard
+    description: Global leaderboard operations
+  - name: Statistics
+    description: Game statistics and analytics
+
+security:
+  - ApiKeyAuth: []
+
+paths:
+  /users:
+    post:
+      tags:
+        - Users
+      summary: Register a new user
+      description: Creates a new user account with full name and email
+      operationId: createUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateUserRequest'
+            examples:
+              validUser:
+                summary: Valid user registration
+                value:
+                  fullName: John Doe
+                  email: john.doe@gmail.com
+      responses:
+        '201':
+          description: User created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+              examples:
+                success:
+                  summary: Successful registration
+                  value:
+                    success: true
+                    data:
+                      email: john.doe@gmail.com
+                      fullName: John Doe
+                      createdDate: '2025-02-03T15:45:00Z'
+                      totalGamesPlayed: 0
+                    message: User registered successfully
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          description: User already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                userExists:
+                  summary: Email already registered
+                  value:
+                    success: false
+                    error:
+                      code: USER_EXISTS
+                      message: User with this email already exists
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /users/{email}:
+    get:
+      tags:
+        - Users
+      summary: Get user profile
+      description: Retrieves user profile including best score
+      operationId: getUser
+      parameters:
+        - $ref: '#/components/parameters/EmailPath'
+      responses:
+        '200':
+          description: User profile retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfileResponse'
+              examples:
+                userProfile:
+                  summary: Complete user profile
+                  value:
+                    success: true
+                    data:
+                      email: john.doe@gmail.com
+                      fullName: John Doe
+                      createdDate: '2025-02-03T15:45:00Z'
+                      lastPlayedDate: '2025-02-03T16:30:00Z'
+                      totalGamesPlayed: 15
+                      bestScore:
+                        score: 15750
+                        gameDate: '2025-02-03T16:30:00Z'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    
+    patch:
+      tags:
+        - Users
+      summary: Update user profile
+      description: Updates user's full name
+      operationId: updateUser
+      parameters:
+        - $ref: '#/components/parameters/EmailPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateUserRequest'
+            examples:
+              updateName:
+                summary: Update full name
+                value:
+                  fullName: Jonathan Doe
+      responses:
+        '200':
+          description: User updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /scores:
+    post:
+      tags:
+        - Scores
+      summary: Submit a game score
+      description: |
+        Submits a new game score for a user. This endpoint will:
+        - Validate the user exists
+        - Save the score to the database
+        - Update user's play statistics
+        - Check if score qualifies for leaderboard
+        - Return leaderboard rank if applicable
+      operationId: submitScore
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubmitScoreRequest'
+            examples:
+              highScore:
+                summary: High score submission
+                value:
+                  email: john.doe@gmail.com
+                  score: 15750
+                  gameDuration: 180
+                  level: Hard
+              quickGame:
+                summary: Quick game
+                value:
+                  email: alice@example.com
+                  score: 5000
+                  gameDuration: 60
+                  level: Easy
+      responses:
+        '201':
+          description: Score submitted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScoreSubmissionResponse'
+              examples:
+                newHighScore:
+                  summary: New high score with leaderboard rank
+                  value:
+                    success: true
+                    data:
+                      scoreId: '9999999999999-1706975400'
+                      email: john.doe@gmail.com
+                      fullName: John Doe
+                      score: 15750
+                      gameDate: '2025-02-03T16:30:00Z'
+                      gameDuration: 180
+                      level: Hard
+                      isNewHighScore: true
+                      leaderboardRank: 5
+                    message: Score submitted successfully
+                regularScore:
+                  summary: Regular score submission
+                  value:
+                    success: true
+                    data:
+                      scoreId: '9999999999999-1706975400'
+                      email: john.doe@gmail.com
+                      fullName: John Doe
+                      score: 5000
+                      gameDate: '2025-02-03T16:30:00Z'
+                      gameDuration: 60
+                      level: Easy
+                      isNewHighScore: false
+                      leaderboardRank: null
+                    message: Score submitted successfully
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                userNotFound:
+                  value:
+                    success: false
+                    error:
+                      code: USER_NOT_FOUND
+                      message: User does not exist. Please register first.
+        '429':
+          $ref: '#/components/responses/RateLimitExceeded'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /scores/{email}:
+    get:
+      tags:
+        - Scores
+      summary: Get user's score history
+      description: Retrieves paginated list of user's game scores, ordered by most recent first
+      operationId: getUserScores
+      parameters:
+        - $ref: '#/components/parameters/EmailPath'
+        - $ref: '#/components/parameters/LimitQuery'
+        - $ref: '#/components/parameters/OffsetQuery'
+      responses:
+        '200':
+          description: Score history retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScoreHistoryResponse'
+              examples:
+                scoreHistory:
+                  summary: User's recent scores
+                  value:
+                    success: true
+                    data:
+                      email: john.doe@gmail.com
+                      fullName: John Doe
+                      totalScores: 42
+                      scores:
+                        - scoreId: '9999999999999-1706975400'
+                          score: 15750
+                          gameDate: '2025-02-03T16:30:00Z'
+                          gameDuration: 180
+                          level: Hard
+                        - scoreId: '9999999999999-1706971800'
+                          score: 14200
+                          gameDate: '2025-02-03T15:30:00Z'
+                          gameDuration: 165
+                          level: Medium
+                      pagination:
+                        limit: 20
+                        offset: 0
+                        hasMore: true
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /scores/{email}/best:
+    get:
+      tags:
+        - Scores
+      summary: Get user's best score
+      description: Retrieves the highest score achieved by a user
+      operationId: getUserBestScore
+      parameters:
+        - $ref: '#/components/parameters/EmailPath'
+      responses:
+        '200':
+          description: Best score retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BestScoreResponse'
+              examples:
+                bestScore:
+                  summary: User's best score
+                  value:
+                    success: true
+                    data:
+                      email: john.doe@gmail.com
+                      fullName: John Doe
+                      bestScore:
+                        scoreId: '9999999999999-1706975400'
+                        score: 15750
+                        gameDate: '2025-02-03T16:30:00Z'
+                        gameDuration: 180
+                        level: Hard
+                        leaderboardRank: 5
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /leaderboard:
+    get:
+      tags:
+        - Leaderboard
+      summary: Get global leaderboard
+      description: |
+        Retrieves the global leaderboard showing top players.
+        Results are cached for 60 seconds for performance.
+      operationId: getLeaderboard
+      parameters:
+        - $ref: '#/components/parameters/LimitQuery'
+        - $ref: '#/components/parameters/OffsetQuery'
+      responses:
+        '200':
+          description: Leaderboard retrieved successfully
+          headers:
+            Cache-Control:
+              description: Cache control header
+              schema:
+                type: string
+                example: public, max-age=60
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LeaderboardResponse'
+              examples:
+                topScores:
+                  summary: Top 3 players
+                  value:
+                    success: true
+                    data:
+                      leaderboard:
+                        - rank: 1
+                          email: alice@example.com
+                          fullName: Alice Smith
+                          score: 25000
+                          gameDate: '2025-02-03T14:20:00Z'
+                        - rank: 2
+                          email: bob@example.com
+                          fullName: Bob Johnson
+                          score: 23500
+                          gameDate: '2025-02-03T13:15:00Z'
+                        - rank: 3
+                          email: carol@example.com
+                          fullName: Carol Williams
+                          score: 22100
+                          gameDate: '2025-02-02T18:45:00Z'
+                      pagination:
+                        limit: 100
+                        offset: 0
+                        total: 100
+                      lastUpdated: '2025-02-03T16:30:00Z'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /leaderboard/rank/{email}:
+    get:
+      tags:
+        - Leaderboard
+      summary: Get user's leaderboard rank
+      description: Retrieves a specific user's rank on the global leaderboard
+      operationId: getUserRank
+      parameters:
+        - $ref: '#/components/parameters/EmailPath'
+      responses:
+        '200':
+          description: User rank retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserRankResponse'
+              examples:
+                topRank:
+                  summary: User in top 100
+                  value:
+                    success: true
+                    data:
+                      email: john.doe@gmail.com
+                      fullName: John Doe
+                      rank: 5
+                      score: 15750
+                      gameDate: '2025-02-03T16:30:00Z'
+                      totalPlayers: 1247
+                      percentile: 99.6
+                notInTop100:
+                  summary: User not in top 100
+                  value:
+                    success: true
+                    data:
+                      email: john.doe@gmail.com
+                      fullName: John Doe
+                      rank: null
+                      score: 5250
+                      gameDate: '2025-02-03T16:30:00Z'
+                      totalPlayers: 1247
+                      percentile: 65.2
+                      message: Not in top 100
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /stats:
+    get:
+      tags:
+        - Statistics
+      summary: Get game statistics
+      description: |
+        Retrieves overall game statistics including player counts,
+        average scores, and recent activity. Cached for 5 minutes.
+      operationId: getStats
+      responses:
+        '200':
+          description: Statistics retrieved successfully
+          headers:
+            Cache-Control:
+              description: Cache control header
+              schema:
+                type: string
+                example: public, max-age=300
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatisticsResponse'
+              examples:
+                gameStats:
+                  summary: Current game statistics
+                  value:
+                    success: true
+                    data:
+                      totalPlayers: 1247
+                      totalGamesPlayed: 52340
+                      averageScore: 8542
+                      highestScore: 25000
+                      topPlayer:
+                        email: alice@example.com
+                        fullName: Alice Smith
+                        score: 25000
+                      last24Hours:
+                        newPlayers: 23
+                        gamesPlayed: 456
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: API key for authentication
+
+  parameters:
+    EmailPath:
+      name: email
+      in: path
+      required: true
+      description: User's email address (URL encoded)
+      schema:
+        type: string
+        format: email
+        example: john.doe@gmail.com
+    
+    LimitQuery:
+      name: limit
+      in: query
+      description: Maximum number of items to return
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+      example: 20
+    
+    OffsetQuery:
+      name: offset
+      in: query
+      description: Number of items to skip for pagination
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
+      example: 0
+
+  schemas:
+    CreateUserRequest:
+      type: object
+      required:
+        - fullName
+        - email
+      properties:
+        fullName:
+          type: string
+          minLength: 2
+          maxLength: 100
+          pattern: '^[a-zA-Z\s]+$'
+          description: User's full name (letters and spaces only)
+          example: John Doe
+        email:
+          type: string
+          format: email
+          maxLength: 255
+          description: User's email address
+          example: john.doe@gmail.com
+
+    UpdateUserRequest:
+      type: object
+      required:
+        - fullName
+      properties:
+        fullName:
+          type: string
+          minLength: 2
+          maxLength: 100
+          pattern: '^[a-zA-Z\s]+$'
+          description: Updated full name
+          example: Jonathan Doe
+
+    SubmitScoreRequest:
+      type: object
+      required:
+        - email
+        - score
+      properties:
+        email:
+          type: string
+          format: email
+          description: User's email address
+          example: john.doe@gmail.com
+        score:
+          type: integer
+          minimum: 0
+          maximum: 999999999
+          description: Game score achieved
+          example: 15750
+        gameDuration:
+          type: integer
+          minimum: 0
+          maximum: 3600
+          description: Game duration in seconds
+          example: 180
+        level:
+          type: string
+          maxLength: 50
+          description: Game difficulty level
+          enum: [Easy, Medium, Hard]
+          example: Hard
+
+    UserData:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          example: john.doe@gmail.com
+        fullName:
+          type: string
+          example: John Doe
+        createdDate:
+          type: string
+          format: date-time
+          example: '2025-02-03T15:45:00Z'
+        totalGamesPlayed:
+          type: integer
+          example: 15
+
+    UserProfileData:
+      allOf:
+        - $ref: '#/components/schemas/UserData'
+        - type: object
+          properties:
+            lastPlayedDate:
+              type: string
+              format: date-time
+              example: '2025-02-03T16:30:00Z'
+            bestScore:
+              type: object
+              properties:
+                score:
+                  type: integer
+                  example: 15750
+                gameDate:
+                  type: string
+                  format: date-time
+                  example: '2025-02-03T16:30:00Z'
+
+    ScoreData:
+      type: object
+      properties:
+        scoreId:
+          type: string
+          example: '9999999999999-1706975400'
+        score:
+          type: integer
+          example: 15750
+        gameDate:
+          type: string
+          format: date-time
+          example: '2025-02-03T16:30:00Z'
+        gameDuration:
+          type: integer
+          example: 180
+        level:
+          type: string
+          example: Hard
+
+    ScoreSubmissionData:
+      allOf:
+        - $ref: '#/components/schemas/ScoreData'
+        - type: object
+          properties:
+            email:
+              type: string
+              format: email
+              example: john.doe@gmail.com
+            fullName:
+              type: string
+              example: John Doe
+            isNewHighScore:
+              type: boolean
+              example: true
+            leaderboardRank:
+              type: integer
+              nullable: true
+              example: 5
+
+    LeaderboardEntry:
+      type: object
+      properties:
+        rank:
+          type: integer
+          example: 1
+        email:
+          type: string
+          format: email
+          example: alice@example.com
+        fullName:
+          type: string
+          example: Alice Smith
+        score:
+          type: integer
+          example: 25000
+        gameDate:
+          type: string
+          format: date-time
+          example: '2025-02-03T14:20:00Z'
+
+    Pagination:
+      type: object
+      properties:
+        limit:
+          type: integer
+          example: 20
+        offset:
+          type: integer
+          example: 0
+        hasMore:
+          type: boolean
+          example: true
+
+    LeaderboardPagination:
+      type: object
+      properties:
+        limit:
+          type: integer
+          example: 100
+        offset:
+          type: integer
+          example: 0
+        total:
+          type: integer
+          example: 100
+
+    ErrorDetail:
+      type: object
+      properties:
+        code:
+          type: string
+          example: VALIDATION_ERROR
+        message:
+          type: string
+          example: Invalid input data
+        details:
+          type: object
+          properties:
+            field:
+              type: string
+              example: email
+            reason:
+              type: string
+              example: Invalid email format
+
+    UserResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/UserData'
+        message:
+          type: string
+          example: User registered successfully
+
+    UserProfileResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/UserProfileData'
+
+    ScoreSubmissionResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/ScoreSubmissionData'
+        message:
+          type: string
+          example: Score submitted successfully
+
+    ScoreHistoryResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            email:
+              type: string
+              format: email
+              example: john.doe@gmail.com
+            fullName:
+              type: string
+              example: John Doe
+            totalScores:
+              type: integer
+              example: 42
+            scores:
+              type: array
+              items:
+                $ref: '#/components/schemas/ScoreData'
+            pagination:
+              $ref: '#/components/schemas/Pagination'
+
+    BestScoreResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            email:
+              type: string
+              format: email
+              example: john.doe@gmail.com
+            fullName:
+              type: string
+              example: John Doe
+            bestScore:
+              allOf:
+                - $ref: '#/components/schemas/ScoreData'
+                - type: object
+                  properties:
+                    leaderboardRank:
+                      type: integer
+                      nullable: true
+                      example: 5
+
+    LeaderboardResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            leaderboard:
+              type: array
+              items:
+                $ref: '#/components/schemas/LeaderboardEntry'
+            pagination:
+              $ref: '#/components/schemas/LeaderboardPagination'
+            lastUpdated:
+              type: string
+              format: date-time
+              example: '2025-02-03T16:30:00Z'
+
+    UserRankResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            email:
+              type: string
+              format: email
+              example: john.doe@gmail.com
+            fullName:
+              type: string
+              example: John Doe
+            rank:
+              type: integer
+              nullable: true
+              example: 5
+            score:
+              type: integer
+              example: 15750
+            gameDate:
+              type: string
+              format: date-time
+              example: '2025-02-03T16:30:00Z'
+            totalPlayers:
+              type: integer
+              example: 1247
+            percentile:
+              type: number
+              format: float
+              example: 99.6
+            message:
+              type: string
+              example: Not in top 100
+
+    StatisticsResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            totalPlayers:
+              type: integer
+              example: 1247
+            totalGamesPlayed:
+              type: integer
+              example: 52340
+            averageScore:
+              type: integer
+              example: 8542
+            highestScore:
+              type: integer
+              example: 25000
+            topPlayer:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: alice@example.com
+                fullName:
+                  type: string
+                  example: Alice Smith
+                score:
+                  type: integer
+                  example: 25000
+            last24Hours:
+              type: object
+              properties:
+                newPlayers:
+                  type: integer
+                  example: 23
+                gamesPlayed:
+                  type: integer
+                  example: 456
+
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          $ref: '#/components/schemas/ErrorDetail'
+
+  responses:
+    BadRequest:
+      description: Invalid input or validation error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            validationError:
+              summary: Validation failed
+              value:
+                success: false
+                error:
+                  code: VALIDATION_ERROR
+                  message: Invalid input data
+                  details:
+                    field: email
+                    reason: Invalid email format
+    
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            userNotFound:
+              summary: User not found
+              value:
+                success: false
+                error:
+                  code: USER_NOT_FOUND
+                  message: User not found
+    
+    RateLimitExceeded:
+      description: Rate limit exceeded
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            rateLimitExceeded:
+              summary: Too many requests
+              value:
+                success: false
+                error:
+                  code: RATE_LIMIT_EXCEEDED
+                  message: Too many score submissions. Please try again later.
+    
+    InternalError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            serverError:
+              summary: Server error
+              value:
+                success: false
+                error:
+                  code: INTERNAL_ERROR
+                  message: An unexpected error occurred. Please try again later.
