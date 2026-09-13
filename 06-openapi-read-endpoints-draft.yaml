@@ -1,0 +1,149 @@
+openapi: 3.0.3
+info:
+  title: BenSpec Editor API - Read Endpoints Draft
+  version: 0.1.0-draft
+  description: Draft OpenAPI for frontend coordination. Current scope includes GET /api/schemes only.
+servers:
+  - url: https://api.example.com
+paths:
+  /api/schemes:
+    get:
+      summary: List schemes
+      description: Returns a list of scheme summaries using a narrow projection for list views.
+      operationId: listSchemes
+      tags:
+        - Schemes
+      parameters:
+        - name: filterNameContains
+          in: query
+          description: Case-insensitive name contains filter.
+          required: false
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 200
+        - name: sortBy
+          in: query
+          description: Sort key for stage-1 list behavior.
+          required: false
+          schema:
+            type: string
+            default: name
+            enum:
+              - name
+              - schemeReference
+        - name: sortOrder
+          in: query
+          description: Sort direction.
+          required: false
+          schema:
+            type: string
+            default: asc
+            enum:
+              - asc
+              - desc
+      responses:
+        '200':
+          description: Schemes list returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SchemeListResponse'
+              examples:
+                success:
+                  value:
+                    items:
+                      - schemeReference: '67'
+                        name: Assembly Members Pension Scheme (NI) 2012
+                    metadata:
+                      sortBy: name
+                      sortOrder: asc
+                      appliedFilters:
+                        filterNameContains: null
+        '400':
+          description: Invalid query parameter value.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+components:
+  schemas:
+    SchemeListItem:
+      type: object
+      required:
+        - schemeReference
+        - name
+      properties:
+        schemeReference:
+          type: string
+          description: External scheme identifier used by API route id semantics.
+        name:
+          type: string
+      additionalProperties: false
+    SchemeListResponseMetadata:
+      type: object
+      required:
+        - sortBy
+        - sortOrder
+        - appliedFilters
+      properties:
+        sortBy:
+          type: string
+          enum:
+            - name
+            - schemeReference
+        sortOrder:
+          type: string
+          enum:
+            - asc
+            - desc
+        appliedFilters:
+          type: object
+          properties:
+            filterNameContains:
+              type: string
+              nullable: true
+          additionalProperties: false
+      additionalProperties: false
+    SchemeListResponse:
+      type: object
+      required:
+        - items
+        - metadata
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/SchemeListItem'
+        metadata:
+          $ref: '#/components/schemas/SchemeListResponseMetadata'
+      additionalProperties: false
+    ProblemDetails:
+      type: object
+      required:
+        - type
+        - title
+        - status
+      properties:
+        type:
+          type: string
+          format: uri
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        instance:
+          type: string
+      additionalProperties: true
+x-runtime-guardrails:
+  getSchemes:
+    consistency: session
+    ruTarget:
+      defaultListReadP95: "<= 15 RU"
+    latencyTarget:
+      defaultListReadP95: "<= 300 ms"
+    notes:
+      - Keep list projection minimal.
+      - Re-evaluate indexing only when new filter/sort predicates are introduced.
