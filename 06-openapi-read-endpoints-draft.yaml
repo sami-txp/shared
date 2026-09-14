@@ -9,10 +9,23 @@ paths:
   /api/schemes:
     get:
       summary: List schemes
-      description: Returns a list of scheme summaries using a narrow projection for list views.
+      description: Returns a paged list of scheme summaries using a narrow projection for list views.
       operationId: listSchemes
       tags:
         - Schemes
+      x-requestObjectExample:
+        metadata:
+          requestId: 0c8d75fe-2ac8-4ef1-9d54-cd045c8fdabc
+          correlationId: 5b66eefa-84e9-423e-aa8c-a6fc8c89a540
+          source: pdp-bridge-web
+          timestampUtc: '2026-07-28T10:34:47.056Z'
+          version: '1.0'
+        data:
+          filterNameContains: assembly
+          sortBy: name
+          sortOrder: asc
+          pageNumber: 1
+          pageSize: 25
       parameters:
         - name: filterNameContains
           in: query
@@ -32,6 +45,7 @@ paths:
             enum:
               - name
               - schemeReference
+              - lastModified
         - name: sortOrder
           in: query
           description: Sort direction.
@@ -42,88 +56,317 @@ paths:
             enum:
               - asc
               - desc
+        - name: pageNumber
+          in: query
+          description: One-based page number.
+          required: false
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        - name: pageSize
+          in: query
+          description: Number of results returned per page.
+          required: false
+          schema:
+            type: integer
+            default: 25
+            minimum: 1
+            maximum: 200
       responses:
         '200':
           description: Schemes list returned.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SchemeListResponse'
+                $ref: '#/components/schemas/SchemeListSuccessResponseEnvelope'
               examples:
                 success:
                   value:
-                    items:
-                      - schemeReference: '67'
-                        name: Assembly Members Pension Scheme (NI) 2012
                     metadata:
-                      sortBy: name
-                      sortOrder: asc
-                      appliedFilters:
+                      requestId: 0c8d75fe-2ac8-4ef1-9d54-cd045c8fdabc
+                      correlationId: 5b66eefa-84e9-423e-aa8c-a6fc8c89a540
+                      source: benspec-editor-api/get-schemes
+                      timestampUtc: '2026-02-10T09:39:28.271Z'
+                      version: '1.0'
+                    success: true
+                    data:
+                      schemes:
+                        - schemeReference: '67'
+                          name: Assembly Members Pension Scheme (NI) 2012
+                          lastModified: '2026-02-09T14:22:11.103Z'
+                      query:
+                        sortBy: name
+                        sortOrder: asc
                         filterNameContains: null
+                        pageNumber: 1
+                        pageSize: 25
+                      pagination:
+                        pageNumber: 1
+                        pageSize: 25
+                        returnedCount: 1
+                        totalCount: 1
+                        totalPages: 1
+                        hasNextPage: false
+                        hasPreviousPage: false
+                    error: null
         '400':
           description: Invalid query parameter value.
           content:
-            application/problem+json:
+            application/json:
               schema:
-                $ref: '#/components/schemas/ProblemDetails'
+                $ref: '#/components/schemas/ErrorResponseEnvelope'
+              examples:
+                badRequest:
+                  value:
+                    metadata:
+                      requestId: 0c8d75fe-2ac8-4ef1-9d54-cd045c8fdabc
+                      correlationId: 5b66eefa-84e9-423e-aa8c-a6fc8c89a540
+                      source: benspec-editor-api/get-schemes
+                      timestampUtc: '2026-02-10T09:39:28.271Z'
+                      version: '1.0'
+                    success: false
+                    data: null
+                    error:
+                      type: https://httpstatuses.com/400
+                      title: Invalid request
+                      status: 400
+                      detail: sortBy must be one of name, schemeReference, or lastModified.
+                      instance: /api/schemes
+                      traceId: d7887fe4-eb17-4fcf-bf5f-04f3f7d5b58d
+        '401':
+          description: Authentication required.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponseEnvelope'
+              examples:
+                unauthorized:
+                  value:
+                    metadata:
+                      requestId: 0c8d75fe-2ac8-4ef1-9d54-cd045c8fdabc
+                      correlationId: 5b66eefa-84e9-423e-aa8c-a6fc8c89a540
+                      source: benspec-editor-api/get-schemes
+                      timestampUtc: '2026-02-10T09:39:28.271Z'
+                      version: '1.0'
+                    success: false
+                    data: null
+                    error:
+                      type: https://httpstatuses.com/401
+                      title: Unauthorized
+                      status: 401
+                      detail: A valid bearer token is required.
+                      instance: /api/schemes
+                      traceId: 869f5bdf-b33a-462d-a5be-fecfcd9e7307
+        '403':
+          description: Access forbidden.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponseEnvelope'
+              examples:
+                forbidden:
+                  value:
+                    metadata:
+                      requestId: 0c8d75fe-2ac8-4ef1-9d54-cd045c8fdabc
+                      correlationId: 5b66eefa-84e9-423e-aa8c-a6fc8c89a540
+                      source: benspec-editor-api/get-schemes
+                      timestampUtc: '2026-02-10T09:39:28.271Z'
+                      version: '1.0'
+                    success: false
+                    data: null
+                    error:
+                      type: https://httpstatuses.com/403
+                      title: Forbidden
+                      status: 403
+                      detail: Caller is not allowed to access this resource.
+                      instance: /api/schemes
+                      traceId: 845f2fce-ec56-4dc8-8ef6-a0d526de5eb5
 components:
   schemas:
+    RequestMetadata:
+      type: object
+      required:
+        - requestId
+        - correlationId
+        - source
+        - timestampUtc
+        - version
+      properties:
+        requestId:
+          type: string
+        correlationId:
+          type: string
+        source:
+          type: string
+        timestampUtc:
+          type: string
+          format: date-time
+        version:
+          type: string
+      additionalProperties: false
+    ResponseMetadata:
+      type: object
+      required:
+        - requestId
+        - correlationId
+        - source
+        - timestampUtc
+        - version
+      properties:
+        requestId:
+          type: string
+        correlationId:
+          type: string
+        source:
+          type: string
+        timestampUtc:
+          type: string
+          format: date-time
+        version:
+          type: string
+      additionalProperties: false
     SchemeListItem:
       type: object
       required:
         - schemeReference
         - name
+        - lastModified
       properties:
         schemeReference:
           type: string
           description: External scheme identifier used by API route id semantics.
         name:
           type: string
+        lastModified:
+          type: string
+          format: date-time
+          description: UTC timestamp of the most recent persisted modification for the scheme document.
       additionalProperties: false
-    SchemeListResponseMetadata:
+    SchemeListRequestData:
       type: object
-      required:
-        - sortBy
-        - sortOrder
-        - appliedFilters
       properties:
+        filterNameContains:
+          type: string
+          nullable: true
         sortBy:
           type: string
           enum:
             - name
             - schemeReference
+            - lastModified
         sortOrder:
           type: string
           enum:
             - asc
             - desc
-        appliedFilters:
-          type: object
-          properties:
-            filterNameContains:
-              type: string
-              nullable: true
-          additionalProperties: false
+        pageNumber:
+          type: integer
+          default: 1
+          minimum: 1
+        pageSize:
+          type: integer
+          default: 25
+          minimum: 1
+          maximum: 200
       additionalProperties: false
-    SchemeListResponse:
+    SchemeListRequestEnvelope:
       type: object
       required:
-        - items
         - metadata
+        - data
       properties:
-        items:
+        metadata:
+          $ref: '#/components/schemas/RequestMetadata'
+        data:
+          $ref: '#/components/schemas/SchemeListRequestData'
+      additionalProperties: false
+    SchemeListResponseData:
+      type: object
+      required:
+        - schemes
+        - query
+        - pagination
+      properties:
+        schemes:
           type: array
           items:
             $ref: '#/components/schemas/SchemeListItem'
-        metadata:
-          $ref: '#/components/schemas/SchemeListResponseMetadata'
+        query:
+          type: object
+          required:
+            - sortBy
+            - sortOrder
+            - filterNameContains
+            - pageNumber
+            - pageSize
+          properties:
+            sortBy:
+              type: string
+              enum:
+                - name
+                - schemeReference
+                - lastModified
+            sortOrder:
+              type: string
+              enum:
+                - asc
+                - desc
+            filterNameContains:
+              type: string
+              nullable: true
+            pageNumber:
+              type: integer
+              minimum: 1
+            pageSize:
+              type: integer
+              minimum: 1
+              maximum: 200
+          additionalProperties: false
+        pagination:
+          $ref: '#/components/schemas/PaginationMetadata'
       additionalProperties: false
-    ProblemDetails:
+    PaginationMetadata:
+      type: object
+      required:
+        - pageNumber
+        - pageSize
+        - returnedCount
+        - totalCount
+        - totalPages
+        - hasNextPage
+        - hasPreviousPage
+      properties:
+        pageNumber:
+          type: integer
+          minimum: 1
+        pageSize:
+          type: integer
+          minimum: 1
+          maximum: 200
+        returnedCount:
+          type: integer
+          minimum: 0
+        totalCount:
+          type: integer
+          minimum: 0
+        totalPages:
+          type: integer
+          minimum: 0
+        hasNextPage:
+          type: boolean
+        hasPreviousPage:
+          type: boolean
+      additionalProperties: false
+    ErrorDetail:
       type: object
       required:
         - type
         - title
         - status
+        - detail
+        - instance
+        - traceId
       properties:
         type:
           type: string
@@ -136,7 +379,52 @@ components:
           type: string
         instance:
           type: string
-      additionalProperties: true
+        traceId:
+          type: string
+      additionalProperties: false
+    SchemeListSuccessResponseEnvelope:
+      type: object
+      required:
+        - metadata
+        - success
+        - data
+        - error
+      properties:
+        metadata:
+          $ref: '#/components/schemas/ResponseMetadata'
+        success:
+          type: boolean
+          enum:
+            - true
+        data:
+          $ref: '#/components/schemas/SchemeListResponseData'
+        error:
+          allOf:
+            - $ref: '#/components/schemas/ErrorDetail'
+          nullable: true
+      additionalProperties: false
+    ErrorResponseEnvelope:
+      type: object
+      required:
+        - metadata
+        - success
+        - data
+        - error
+      properties:
+        metadata:
+          $ref: '#/components/schemas/ResponseMetadata'
+        success:
+          type: boolean
+          enum:
+            - false
+        data:
+          type: object
+          nullable: true
+          description: Null for error responses.
+          additionalProperties: false
+        error:
+          $ref: '#/components/schemas/ErrorDetail'
+      additionalProperties: false
 x-runtime-guardrails:
   getSchemes:
     consistency: session
@@ -144,6 +432,8 @@ x-runtime-guardrails:
       defaultListReadP95: "<= 15 RU"
     latencyTarget:
       defaultListReadP95: "<= 300 ms"
+    projection:
+      - lastModified
     notes:
       - Keep list projection minimal.
       - Re-evaluate indexing only when new filter/sort predicates are introduced.
