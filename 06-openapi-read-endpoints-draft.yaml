@@ -9,7 +9,7 @@ paths:
   /api/schemes:
     get:
       summary: List schemes
-      description: Returns a paged list of scheme summaries using a narrow projection for list views.
+      description: Returns a list of scheme summaries using a narrow projection for list views. Pagination is optional and can be omitted when not needed.
       operationId: listSchemes
       tags:
         - Schemes
@@ -24,8 +24,6 @@ paths:
           filterNameContains: assembly
           sortBy: name
           sortOrder: asc
-          pageNumber: 1
-          pageSize: 25
       parameters:
         - name: filterNameContains
           in: query
@@ -58,7 +56,7 @@ paths:
               - desc
         - name: pageNumber
           in: query
-          description: One-based page number.
+          description: Optional one-based page number. When omitted, the API returns the default first page or a non-paged result set depending on implementation.
           required: false
           schema:
             type: integer
@@ -66,7 +64,7 @@ paths:
             minimum: 1
         - name: pageSize
           in: query
-          description: Number of results returned per page.
+          description: Optional page size. When omitted, the server may return the default result set size or a non-paged result set.
           required: false
           schema:
             type: integer
@@ -92,23 +90,14 @@ paths:
                     success: true
                     data:
                       schemes:
-                        - schemeReference: '67'
+                        - schemeId: 67
+                          schemeReference: '67'
                           name: Assembly Members Pension Scheme (NI) 2012
                           lastModified: '2026-02-09T14:22:11.103Z'
                       query:
                         sortBy: name
                         sortOrder: asc
                         filterNameContains: null
-                        pageNumber: 1
-                        pageSize: 25
-                      pagination:
-                        pageNumber: 1
-                        pageSize: 25
-                        returnedCount: 1
-                        totalCount: 1
-                        totalPages: 1
-                        hasNextPage: false
-                        hasPreviousPage: false
                     error: null
         '400':
           description: Invalid query parameter value.
@@ -229,10 +218,14 @@ components:
     SchemeListItem:
       type: object
       required:
+        - schemeId
         - schemeReference
         - name
         - lastModified
       properties:
+        schemeId:
+          type: integer
+          description: Internal integer identifier for the scheme record.
         schemeReference:
           type: string
           description: External scheme identifier used by API route id semantics.
@@ -251,12 +244,14 @@ components:
           nullable: true
         sortBy:
           type: string
+          default: name
           enum:
             - name
             - schemeReference
             - lastModified
         sortOrder:
           type: string
+          default: asc
           enum:
             - asc
             - desc
@@ -285,8 +280,6 @@ components:
       type: object
       required:
         - schemes
-        - query
-        - pagination
       properties:
         schemes:
           type: array
@@ -298,17 +291,17 @@ components:
             - sortBy
             - sortOrder
             - filterNameContains
-            - pageNumber
-            - pageSize
           properties:
             sortBy:
               type: string
+              default: name
               enum:
                 - name
                 - schemeReference
                 - lastModified
             sortOrder:
               type: string
+              default: asc
               enum:
                 - asc
                 - desc
@@ -325,6 +318,7 @@ components:
           additionalProperties: false
         pagination:
           $ref: '#/components/schemas/PaginationMetadata'
+          nullable: true
       additionalProperties: false
     PaginationMetadata:
       type: object
