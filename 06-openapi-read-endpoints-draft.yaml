@@ -92,6 +92,7 @@ paths:
                       schemes:
                         - schemeId: 67
                           schemeReference: '67'
+                          pstrNumber: '12345678'
                           name: Assembly Members Pension Scheme (NI) 2012
                           lastModified: '2026-02-09T14:22:11.103Z'
                       query:
@@ -171,6 +172,88 @@ paths:
                       detail: Caller is not allowed to access this resource.
                       instance: /api/schemes
                       traceId: 845f2fce-ec56-4dc8-8ef6-a0d526de5eb5
+  /api/schemes/{id}:
+    get:
+      summary: Get scheme by id
+      description: Returns the full scheme detail for a single scheme using the public schemeReference value as the route id.
+      operationId: getSchemeById
+      tags:
+        - Schemes
+      parameters:
+        - name: id
+          in: path
+          description: Public scheme identity. This maps to schemeReference for the API contract.
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Scheme detail returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SchemeDetailSuccessResponseEnvelope'
+              examples:
+                success:
+                  value:
+                    metadata:
+                      requestId: 0c8d75fe-2ac8-4ef1-9d54-cd045c8fdabc
+                      correlationId: 5b66eefa-84e9-423e-aa8c-a6fc8c89a540
+                      source: benspec-editor-api/get-scheme-by-id
+                      timestampUtc: '2026-02-10T09:39:28.271Z'
+                      version: '1.0'
+                    success: true
+                    data:
+                      scheme:
+                        name: ''
+                        pstrNumber: '12345678'
+                        schemeReference: '67'
+                        lastModified: '2026-02-09T14:22:11.103Z'
+                        lastModifiedBy: User123
+                        schemeId: 67
+                        renewalDate: '2026-02-09T14:22:11.103Z'
+                        actuarialAndAdministration:
+                          lastTriennialValuationDate: '2026-02-09T14:22:11.103Z'
+                          dateOfLastFactorReviewCommutationFactors: '2026-02-09T14:22:11.103Z'
+                          dateOfLastFactorReviewErLrFactors: '2026-02-09T14:22:11.103Z'
+                          administrationSystemId: ADM123
+                          typeOfSchemeIfMultiemployer: Multiemployer
+                        principalEmployer:
+                          principalEmployer: Some Employer Name
+                          dateOfParticipation: '2026-02-09T14:22:11.103Z'
+                          econIfRelevant: ECON123
+                          sconIfRelevant: SCON123
+                        sections:
+                          - sectionName: Section 1
+                            sectionId: 1
+                        categories:
+                          - categoryName: Category 1
+                            categoryId: 1
+                    error: null
+        '404':
+          description: Scheme not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponseEnvelope'
+              examples:
+                notFound:
+                  value:
+                    metadata:
+                      requestId: 0c8d75fe-2ac8-4ef1-9d54-cd045c8fdabc
+                      correlationId: 5b66eefa-84e9-423e-aa8c-a6fc8c89a540
+                      source: benspec-editor-api/get-scheme-by-id
+                      timestampUtc: '2026-02-10T09:39:28.271Z'
+                      version: '1.0'
+                    success: false
+                    data: null
+                    error:
+                      type: https://httpstatuses.com/404
+                      title: Scheme not found
+                      status: 404
+                      detail: No scheme matches the supplied id.
+                      instance: /api/schemes/67
+                      traceId: 3d0efce4-4fc5-4a64-b4d7-3f07df61deaf
 components:
   schemas:
     RequestMetadata:
@@ -220,6 +303,7 @@ components:
       required:
         - schemeId
         - schemeReference
+        - pstrNumber
         - name
         - lastModified
       properties:
@@ -229,6 +313,9 @@ components:
         schemeReference:
           type: string
           description: External scheme identifier used by API route id semantics.
+        pstrNumber:
+          type: string
+          description: Pension scheme registration number (PSTR) as a string value.
         name:
           type: string
         lastModified:
@@ -392,6 +479,142 @@ components:
             - true
         data:
           $ref: '#/components/schemas/SchemeListResponseData'
+        error:
+          allOf:
+            - $ref: '#/components/schemas/ErrorDetail'
+          nullable: true
+      additionalProperties: false
+    SchemeDetailItem:
+      type: object
+      required:
+        - name
+        - pstrNumber
+        - schemeReference
+        - lastModified
+        - lastModifiedBy
+        - schemeId
+        - renewalDate
+        - actuarialAndAdministration
+        - principalEmployer
+        - sections
+        - categories
+      properties:
+        name:
+          type: string
+        pstrNumber:
+          type: string
+        schemeReference:
+          type: string
+        lastModified:
+          type: string
+          format: date-time
+        lastModifiedBy:
+          type: string
+        schemeId:
+          type: integer
+        renewalDate:
+          type: string
+          format: date-time
+        actuarialAndAdministration:
+          $ref: '#/components/schemas/ActuarialAndAdministration'
+        principalEmployer:
+          $ref: '#/components/schemas/PrincipalEmployer'
+        sections:
+          type: array
+          items:
+            $ref: '#/components/schemas/SectionItem'
+        categories:
+          type: array
+          items:
+            $ref: '#/components/schemas/CategoryItem'
+      additionalProperties: false
+    ActuarialAndAdministration:
+      type: object
+      required:
+        - lastTriennialValuationDate
+        - dateOfLastFactorReviewCommutationFactors
+        - dateOfLastFactorReviewErLrFactors
+        - administrationSystemId
+        - typeOfSchemeIfMultiemployer
+      properties:
+        lastTriennialValuationDate:
+          type: string
+          format: date-time
+        dateOfLastFactorReviewCommutationFactors:
+          type: string
+          format: date-time
+        dateOfLastFactorReviewErLrFactors:
+          type: string
+          format: date-time
+        administrationSystemId:
+          type: string
+        typeOfSchemeIfMultiemployer:
+          type: string
+      additionalProperties: false
+    PrincipalEmployer:
+      type: object
+      required:
+        - principalEmployer
+        - dateOfParticipation
+        - econIfRelevant
+        - sconIfRelevant
+      properties:
+        principalEmployer:
+          type: string
+        dateOfParticipation:
+          type: string
+          format: date-time
+        econIfRelevant:
+          type: string
+        sconIfRelevant:
+          type: string
+      additionalProperties: false
+    SectionItem:
+      type: object
+      required:
+        - sectionName
+        - sectionId
+      properties:
+        sectionName:
+          type: string
+        sectionId:
+          type: integer
+      additionalProperties: false
+    CategoryItem:
+      type: object
+      required:
+        - categoryName
+        - categoryId
+      properties:
+        categoryName:
+          type: string
+        categoryId:
+          type: integer
+      additionalProperties: false
+    SchemeDetailResponseData:
+      type: object
+      required:
+        - scheme
+      properties:
+        scheme:
+          $ref: '#/components/schemas/SchemeDetailItem'
+      additionalProperties: false
+    SchemeDetailSuccessResponseEnvelope:
+      type: object
+      required:
+        - metadata
+        - success
+        - data
+        - error
+      properties:
+        metadata:
+          $ref: '#/components/schemas/ResponseMetadata'
+        success:
+          type: boolean
+          enum:
+            - true
+        data:
+          $ref: '#/components/schemas/SchemeDetailResponseData'
         error:
           allOf:
             - $ref: '#/components/schemas/ErrorDetail'
